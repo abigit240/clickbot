@@ -81,11 +81,21 @@ def chat():
     try:
         model = genai.GenerativeModel("gemini-pro")
         response = model.generate_content(user_message)
-
-        return jsonify({"response": response.text})
+        
+        # Handle the response properly - response structure may vary based on API version
+        if hasattr(response, 'text'):
+            # For newer versions of the Gemini API
+            return jsonify({"response": response.text})
+        elif hasattr(response, 'parts'):
+            # Alternative response structure
+            return jsonify({"response": ''.join(part.text for part in response.parts)})
+        else:
+            # Fallback for other response structures
+            return jsonify({"response": str(response)})
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Error: {str(e)}")
+        return jsonify({"response": f"Error: {str(e)}"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
