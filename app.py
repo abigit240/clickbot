@@ -86,51 +86,81 @@ def chat():
     print(f"Received message: {user_message}")
 
     try:
+        # Print API key status (not the key itself, just if it exists)
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return jsonify({"response": "ERROR: GEMINI_API_KEY is not set. Please add it to your Secrets."}), 500
+        
+        print(f"API key present: {bool(api_key)}")
+        print(f"API key length: {len(api_key)}")
+        
+        # Use API key from environment
+        genai.configure(api_key=api_key)
+        
         # List available models to check what's available
-        print("Available models:")
-        models = genai.list_models()
-        for model in models:
-            print(f"- {model.name}")
-        
-        # Try to use gemini-1.5-flash first, then gemini-1.0-pro, or any available Gemini model
-        gemini_models = [
-            "gemini-1.5-flash",
-            "gemini-1.5-pro",
-            "gemini-1.0-pro",
-            "gemini-pro"
-        ]
-        
-        model_name = None
-        
-        # First try the preferred models in order
-        for preferred in gemini_models:
-            for m in models:
-                if preferred in m.name.lower():
-                    model_name = m.name
-                    print(f"Using preferred model: {model_name}")
-                    break
-            if model_name:
-                break
+        print("Fetching available models...")
+        try:
+            models = genai.list_models()
+            if not models:
+                return jsonify({"response": "No models available. Your API key may be invalid or have insufficient permissions."}), 500
                 
-        # If no preferred model found, try any Gemini model
-        if not model_name:
-            for m in models:
-                if 'gemini' in m.name.lower():
-                    model_name = m.name
-                    print(f"Using available Gemini model: {model_name}")
+            print("Available models:")
+            for model in models:
+                print(f"- {model.name}")
+                # Print more details about capabilities
+                if hasattr(model, 'supported_generation_methods'):
+                    print(f"  Supported methods: {model.supported_generation_methods}")
+                    
+            # Get only models that support text generation
+            text_models = [m for m in models if hasattr(m, 'supported_generation_methods') and 
+                          'generateContent' in m.supported_generation_methods]
+            
+            if not text_models:
+                return jsonify({"response": "No models supporting text generation found. Please check your API key permissions."}), 500
+                
+            print(f"Found {len(text_models)} models supporting text generation")
+            
+            # Try to use these models in order of preference
+            gemini_models = [
+                "gemini-1.5-flash",
+                "gemini-1.5-pro",
+                "gemini-1.0-pro",
+                "gemini-pro"
+            ]
+            
+            # Use the full model name from the API (models/name)
+            model_name = None
+            
+            # First try the preferred models in order
+            for preferred in gemini_models:
+                for m in models:
+                    if preferred in m.name.lower():
+                        model_name = m.name
+                        print(f"Using preferred model: {model_name}")
+                        break
+                if model_name:
                     break
-        
-        # Last resort - use first available model
-        if not model_name and models:
-            model_name = models[0].name
-            print(f"Using first available model: {model_name}")
+                    
+            # If no preferred model found, try any model that supports generateContent
+            if not model_name and text_models:
+                model_name = text_models[0].name
+                print(f"Using first available text model: {model_name}")
+                
+            if not model_name:
+                return jsonify({"response": "No suitable models available. Please check your API key."}), 500
+                
+            print(f"Final model selection: {model_name}")
             
-        if not model_name:
-            return jsonify({"response": "No models available. Please check your API key."}), 500
+            # Use the model without the "models/" prefix if it has one
+            model_id = model_name.split('/')[-1] if '/' in model_name else model_name
+            print(f"Using model ID: {model_id}")
             
-        print(f"Final model selection: {model_name}")
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(user_message)
+            model = genai.GenerativeModel(model_id)
+            response = model.generate_content(user_message)
+            
+        except Exception as model_error:
+            print(f"Error listing models: {str(model_error)}")
+            return jsonify({"response": f"Error listing models: {str(model_error)}. Please check your API key."}), 500
         
         print(f"Response type: {type(response)}")
         print(f"Response dir: {dir(response)}")
