@@ -91,8 +91,25 @@ def chat():
         for model in genai.list_models():
             print(f"- {model.name}")
         
-        # Use the specific model name with gemini-1.0-pro
-        model = genai.GenerativeModel('gemini-1.0-pro')
+        # Get available models and use an appropriate Gemini model
+        models = genai.list_models()
+        model_name = None
+        
+        # Find a suitable Gemini model
+        for m in models:
+            if 'gemini' in m.name.lower():
+                model_name = m.name
+                print(f"Using model: {model_name}")
+                break
+        
+        if not model_name:
+            print("No Gemini models found, using default model")
+            model_name = models[0].name if models else None
+            
+        if not model_name:
+            return jsonify({"response": "No models available. Please check your API key."}), 500
+            
+        model = genai.GenerativeModel(model_name)
         response = model.generate_content(user_message)
         
         print(f"Response type: {type(response)}")
