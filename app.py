@@ -54,7 +54,13 @@ def home():
                 })
                 .then(response => response.json())
                 .then(data => {
-                    chatBox.innerHTML += `<p><strong>AI:</strong> ${data.response}</p>`;
+                    console.log("Received data:", data);
+                    if (data && data.response) {
+                        chatBox.innerHTML += `<p><strong>AI:</strong> ${data.response}</p>`;
+                    } else {
+                        chatBox.innerHTML += `<p><strong>AI:</strong> No response received</p>`;
+                        console.error('Empty response:', data);
+                    }
                     chatBox.scrollTop = chatBox.scrollHeight;
                 })
                 .catch(error => {
@@ -77,24 +83,44 @@ def home():
 @app.route("/chat", methods=["POST"])
 def chat():
     user_message = request.json.get("message")
+    print(f"Received message: {user_message}")
 
     try:
         model = genai.GenerativeModel("gemini-pro")
         response = model.generate_content(user_message)
         
-        # Handle the response properly - response structure may vary based on API version
+        print(f"Response type: {type(response)}")
+        print(f"Response dir: {dir(response)}")
+        
+        # More detailed handling of response structure
+        response_text = None
+        
         if hasattr(response, 'text'):
-            # For newer versions of the Gemini API
-            return jsonify({"response": response.text})
-        elif hasattr(response, 'parts'):
-            # Alternative response structure
-            return jsonify({"response": ''.join(part.text for part in response.parts)})
-        else:
-            # Fallback for other response structures
-            return jsonify({"response": str(response)})
+            print("Using response.text")
+            response_text = response.text
+        elif hasattr(response, 'parts') and response.parts:
+            print("Using response.parts")
+            response_text = ''.join(part.text for part in response.parts)
+        elif hasattr(response, 'candidates') and response.candidates:
+            print("Using response.candidates")
+            candidates = response.candidates
+            if candidates and hasattr(candidates[0], 'content'):
+                content = candidates[0].content
+                if hasattr(content, 'parts') and content.parts:
+                    response_text = ''.join(str(part.text) for part in content.parts)
+        
+        if response_text is None:
+            print(f"Fallback to string representation: {str(response)}")
+            response_text = f"Could not parse response: {str(response)}"
+            
+        print(f"Final response text: {response_text}")
+        return jsonify({"response": response_text})
 
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         print(f"Error: {str(e)}")
+        print(f"Details: {error_details}")
         return jsonify({"response": f"Error: {str(e)}"}), 500
 
 if __name__ == "__main__":
