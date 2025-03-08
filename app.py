@@ -88,27 +88,47 @@ def chat():
     try:
         # List available models to check what's available
         print("Available models:")
-        for model in genai.list_models():
+        models = genai.list_models()
+        for model in models:
             print(f"- {model.name}")
         
-        # Get available models and use an appropriate Gemini model
-        models = genai.list_models()
+        # Try to use gemini-1.5-flash first, then gemini-1.0-pro, or any available Gemini model
+        gemini_models = [
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-1.0-pro",
+            "gemini-pro"
+        ]
+        
         model_name = None
         
-        # Find a suitable Gemini model
-        for m in models:
-            if 'gemini' in m.name.lower():
-                model_name = m.name
-                print(f"Using model: {model_name}")
+        # First try the preferred models in order
+        for preferred in gemini_models:
+            for m in models:
+                if preferred in m.name.lower():
+                    model_name = m.name
+                    print(f"Using preferred model: {model_name}")
+                    break
+            if model_name:
                 break
-        
+                
+        # If no preferred model found, try any Gemini model
         if not model_name:
-            print("No Gemini models found, using default model")
-            model_name = models[0].name if models else None
+            for m in models:
+                if 'gemini' in m.name.lower():
+                    model_name = m.name
+                    print(f"Using available Gemini model: {model_name}")
+                    break
+        
+        # Last resort - use first available model
+        if not model_name and models:
+            model_name = models[0].name
+            print(f"Using first available model: {model_name}")
             
         if not model_name:
             return jsonify({"response": "No models available. Please check your API key."}), 500
             
+        print(f"Final model selection: {model_name}")
         model = genai.GenerativeModel(model_name)
         response = model.generate_content(user_message)
         
