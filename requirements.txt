@@ -1,4 +1,4 @@
-flask
-google-generativeai
-gunicorn
-grpcio
+
+flask==2.2.3
+gunicorn==20.1.0
+google-generativeai>=0.3.0

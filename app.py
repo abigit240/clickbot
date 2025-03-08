@@ -86,7 +86,13 @@ def chat():
     print(f"Received message: {user_message}")
 
     try:
-        model = genai.GenerativeModel("gemini-pro")
+        # List available models to check what's available
+        print("Available models:")
+        for model in genai.list_models():
+            print(f"- {model.name}")
+        
+        # Use the specific model name with gemini-1.0-pro
+        model = genai.GenerativeModel('gemini-1.0-pro')
         response = model.generate_content(user_message)
         
         print(f"Response type: {type(response)}")
